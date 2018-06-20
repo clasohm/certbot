@@ -1,6 +1,7 @@
 """Certbot Route53 authenticator plugin."""
 import collections
 import logging
+import os
 import time
 
 import boto3
@@ -102,6 +103,16 @@ class Authenticator(dns_common.DNSAuthenticator):
         return zones[0][1]
 
     def _change_txt_record(self, action, validation_domain_name, validation):
+        # If the environment variable AWS_DOMAIN_REPLACE is set and is a string
+        # of two values separated by one ":", replace the first value with the
+        # second one in the validation_domain_name. This can be used when the
+        # AWS access key doesn't have write permissions for the original domain.
+        # For Let's Encrypt verification to work, there needs to be a CNAME
+        # pointing to the replacement domain.
+        if "AWS_DOMAIN_REPLACE" in os.environ and len(os.environ["AWS_DOMAIN_REPLACE"].split(":")) == 2:
+            (domain_orig, domain_replace) = os.environ["AWS_DOMAIN_REPLACE"].split(":")
+            validation_domain_name = validation_domain_name.replace(domain_orig, domain_replace)
+
         zone_id = self._find_zone_id_for_domain(validation_domain_name)
 
         rrecords = self._resource_records[validation_domain_name]
